@@ -7,7 +7,7 @@ Run with:
 Interactive API docs:
     http://localhost:8000/docs
 """
-
+from backend.main import app
 import time
 import logging
 from fastapi import FastAPI, HTTPException
