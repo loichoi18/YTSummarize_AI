@@ -11,7 +11,7 @@ Cleans raw YouTube transcripts and prepares them for the LLM:
 import os
 import re
 import logging
-from .extractor import TranscriptEntry, format_timestamp
+from extractor import TranscriptEntry, format_timestamp
 
 logger = logging.getLogger(__name__)
 
