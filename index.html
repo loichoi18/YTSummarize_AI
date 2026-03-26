@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>YTSummarize AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--surface:#111;--surface2:#1a1a1a;--surface3:#222;
+  --border:#2a2a2a;--border2:#333;
+  --red:#ff4444;--red2:#cc2222;
+  --white:#f5f5f5;--muted:#888;--dim:#555;
+  --radius:10px;
+}
+body{background:var(--bg);color:var(--white);font-family:'Inter',sans-serif;
+  font-weight:400;line-height:1.6;min-height:100vh;padding-bottom:4rem}
+
+/* ── HEADER ── */
+header{
+  padding:2rem 2rem 1.5rem;max-width:800px;margin:0 auto;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+}
+.logo{display:flex;align-items:center;gap:.75rem}
+.logo-icon{
+  width:36px;height:36px;background:var(--red);border-radius:8px;
+  display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;
+}
+.logo-text{font-size:1.1rem;font-weight:600;letter-spacing:-.02em}
+.logo-sub{font-size:.75rem;color:var(--muted);font-family:'JetBrains Mono',monospace}
+.header-right{font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--dim)}
+
+/* ── MAIN ── */
+main{max-width:800px;margin:0 auto;padding:2.5rem 2rem 0}
+
+/* ── INPUT CARD ── */
+.input-card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);padding:1.75rem;margin-bottom:2rem;
+}
+.input-label{
+  font-family:'JetBrains Mono',monospace;font-size:.72rem;
+  color:var(--muted);letter-spacing:.08em;margin-bottom:.75rem;display:block;
+}
+.url-row{display:flex;gap:.75rem}
+.url-input{
+  flex:1;background:var(--surface2);border:1px solid var(--border);
+  border-radius:8px;padding:.75rem 1rem;color:var(--white);
+  font-family:'Inter',sans-serif;font-size:.95rem;outline:none;
+  transition:border-color .2s;
+}
+.url-input::placeholder{color:var(--dim)}
+.url-input:focus{border-color:var(--red)}
+.submit-btn{
+  background:var(--red);color:#fff;border:none;border-radius:8px;
+  padding:.75rem 1.5rem;font-family:'Inter',sans-serif;font-size:.9rem;
+  font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s;
+  display:flex;align-items:center;gap:.5rem;
+}
+.submit-btn:hover{background:var(--red2);transform:translateY(-1px)}
+.submit-btn:disabled{background:var(--dim);cursor:not-allowed;transform:none}
+.hint{font-size:.78rem;color:var(--dim);margin-top:.75rem}
+
+/* ── LOADING ── */
+#loading{display:none;text-align:center;padding:3rem 0}
+.spinner{
+  width:36px;height:36px;border:3px solid var(--border);
+  border-top-color:var(--red);border-radius:50%;
+  animation:spin .8s linear infinite;margin:0 auto 1rem;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-text{color:var(--muted);font-size:.9rem}
+.loading-stage{
+  font-family:'JetBrains Mono',monospace;font-size:.75rem;
+  color:var(--dim);margin-top:.5rem;
+}
+
+/* ── ERROR ── */
+#error{
+  display:none;background:#1a0a0a;border:1px solid #441111;
+  border-radius:var(--radius);padding:1.25rem 1.5rem;
+  color:#ff8888;font-size:.9rem;margin-bottom:1.5rem;
+}
+
+/* ── RESULT ── */
+#result{display:none}
+
+.video-meta{
+  display:flex;align-items:center;gap:1rem;margin-bottom:1.75rem;
+  padding:1.25rem;background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);
+}
+.yt-thumb{width:80px;height:56px;object-fit:cover;border-radius:6px;flex-shrink:0;background:var(--surface2)}
+.meta-info{flex:1;min-width:0}
+.meta-title{font-weight:500;font-size:.95rem;margin-bottom:.3rem;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta-stats{
+  display:flex;gap:1rem;flex-wrap:wrap;
+  font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--muted);
+}
+.watch-btn{
+  background:var(--red);color:#fff;text-decoration:none;
+  padding:.45rem 1rem;border-radius:6px;font-size:.8rem;font-weight:500;
+  white-space:nowrap;transition:background .2s;
+}
+.watch-btn:hover{background:var(--red2)}
+
+/* ── SECTIONS ── */
+.section{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius);margin-bottom:1rem;overflow:hidden;
+}
+.section-header{
+  display:flex;align-items:center;gap:.75rem;padding:1rem 1.25rem;
+  cursor:pointer;user-select:none;transition:background .15s;
+}
+.section-header:hover{background:var(--surface2)}
+.section-icon{font-size:1rem;flex-shrink:0}
+.section-title{font-weight:500;font-size:.92rem;flex:1}
+.section-chevron{
+  color:var(--dim);font-size:.8rem;transition:transform .2s;flex-shrink:0;
+}
+.section.open .section-chevron{transform:rotate(180deg)}
+.section-body{
+  display:none;padding:0 1.25rem 1.25rem;
+  border-top:1px solid var(--border);padding-top:1rem;
+}
+.section.open .section-body{display:block}
+
+/* TLDR */
+.tldr-text{color:var(--muted);line-height:1.7;font-size:.95rem}
+
+/* KEY TAKEAWAYS */
+.takeaway-list{list-style:none;display:flex;flex-direction:column;gap:.6rem}
+.takeaway-list li{
+  display:flex;gap:.75rem;padding:.75rem;background:var(--surface2);
+  border-radius:8px;border:1px solid var(--border);font-size:.88rem;color:var(--muted);
+}
+.takeaway-list li::before{
+  content:'▸';color:var(--red);flex-shrink:0;margin-top:.05rem;font-size:.85rem;
+}
+
+/* TIMESTAMPS */
+.timestamp-list{display:flex;flex-direction:column;gap:.5rem}
+.ts-item{
+  display:flex;align-items:flex-start;gap:1rem;padding:.65rem .75rem;
+  border-radius:8px;transition:background .15s;
+  text-decoration:none;color:inherit;border:1px solid transparent;
+}
+.ts-item:hover{background:var(--surface2);border-color:var(--border)}
+.ts-time{
+  font-family:'JetBrains Mono',monospace;font-size:.78rem;color:var(--red);
+  background:rgba(255,68,68,.1);padding:.2rem .55rem;border-radius:5px;
+  white-space:nowrap;flex-shrink:0;margin-top:.1rem;border:1px solid rgba(255,68,68,.2);
+}
+.ts-label{font-size:.88rem;color:var(--muted)}
+
+/* CHAPTERS */
+.chapter-list{display:flex;flex-direction:column;gap:.6rem}
+.chapter-item{
+  padding:.85rem 1rem;background:var(--surface2);
+  border-radius:8px;border-left:3px solid var(--red);
+}
+.chapter-header{display:flex;align-items:center;gap:.75rem;margin-bottom:.35rem}
+.chapter-start{
+  font-family:'JetBrains Mono',monospace;font-size:.72rem;color:var(--muted);
+}
+.chapter-title{font-weight:500;font-size:.9rem}
+.chapter-summary{font-size:.84rem;color:var(--dim);line-height:1.6}
+
+/* QUOTES */
+.quote-list{display:flex;flex-direction:column;gap:.75rem}
+.quote-item{
+  padding:.85rem 1rem .85rem 1.25rem;
+  border-left:3px solid var(--border2);
+  font-style:italic;font-size:.9rem;color:var(--muted);line-height:1.7;
+  background:var(--surface2);border-radius:0 8px 8px 0;
+}
+
+/* TAGS */
+.tag-list{display:flex;flex-wrap:wrap;gap:.5rem}
+.tag{
+  font-family:'JetBrains Mono',monospace;font-size:.72rem;
+  color:var(--muted);background:var(--surface2);
+  border:1px solid var(--border2);padding:.3rem .75rem;border-radius:100px;
+}
+
+/* FOOTER */
+.result-footer{
+  margin-top:1.5rem;padding:1rem;
+  font-family:'JetBrains Mono',monospace;font-size:.7rem;
+  color:var(--dim);text-align:center;border-top:1px solid var(--border);
+}
+
+/* ── RESPONSIVE ── */
+@media(max-width:600px){
+  .url-row{flex-direction:column}
+  .video-meta{flex-direction:column;align-items:flex-start}
+  .yt-thumb{width:100%;height:auto}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">▶</div>
+    <div>
+      <div class="logo-text">YTSummarize AI</div>
+      <div class="logo-sub">powered by GPT-4o</div>
+    </div>
+  </div>
+  <div class="header-right">by loichoi18 · UTS AI</div>
+</header>
+
+<main>
+
+  <!-- INPUT -->
+  <div class="input-card">
+    <label class="input-label" for="urlInput">YOUTUBE URL</label>
+    <div class="url-row">
+      <input
+        id="urlInput"
+        class="url-input"
+        type="url"
+        placeholder="https://www.youtube.com/watch?v=..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="submit-btn" id="submitBtn" onclick="handleSubmit()">
+        <span id="btnIcon">✦</span>
+        <span id="btnText">Summarize</span>
+      </button>
+    </div>
+    <p class="hint">Works with any YouTube video that has captions enabled.</p>
+  </div>
+
+  <!-- LOADING -->
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Analysing video...</div>
+    <div class="loading-stage" id="loadingStage">Fetching transcript</div>
+  </div>
+
+  <!-- ERROR -->
+  <div id="error"></div>
+
+  <!-- RESULT -->
+  <div id="result"></div>
+
+</main>
+
+<script>
+const API = 'http://localhost:8000';
+
+const stages = [
+  'Fetching transcript...',
+  'Cleaning and formatting...',
+  'Sending to GPT-4o...',
+  'Building structured summary...',
+];
+let stageIdx = 0, stageTimer = null;
+
+function cycleStage() {
+  document.getElementById('loadingStage').textContent = stages[stageIdx % stages.length];
+  stageIdx++;
+  stageTimer = setTimeout(cycleStage, 2800);
+}
+
+function setLoading(on) {
+  document.getElementById('loading').style.display = on ? 'block' : 'none';
+  document.getElementById('submitBtn').disabled = on;
+  document.getElementById('btnText').textContent = on ? 'Analysing...' : 'Summarize';
+  if (on) { stageIdx = 0; cycleStage(); }
+  else { clearTimeout(stageTimer); }
+}
+
+function showError(msg) {
+  const el = document.getElementById('error');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+}
+
+function clearAll() {
+  document.getElementById('error').style.display = 'none';
+  document.getElementById('result').style.display = 'none';
+  document.getElementById('result').innerHTML = '';
+}
+
+async function handleSubmit() {
+  const url = document.getElementById('urlInput').value.trim();
+  if (!url) { showError('Please paste a YouTube URL.'); return; }
+
+  clearAll();
+  setLoading(true);
+
+  try {
+    const res = await fetch(`${API}/api/summarize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url })
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Something went wrong.');
+
+    renderResult(data);
+  } catch (err) {
+    showError(err.message || 'Could not reach the backend. Is it running?');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function renderResult(d) {
+  const el = document.getElementById('result');
+  const dur = d.duration_seconds ? formatDuration(d.duration_seconds) : '—';
+  const words = d.word_count ? d.word_count.toLocaleString() : '—';
+
+  let html = `
+    <div class="video-meta">
+      <img class="yt-thumb" src="https://img.youtube.com/vi/${d.video_id}/mqdefault.jpg" alt="thumbnail" onerror="this.style.display='none'"/>
+      <div class="meta-info">
+        <div class="meta-title">${escHtml(d.url)}</div>
+        <div class="meta-stats">
+          <span>⏱ ${dur}</span>
+          <span>📝 ${words} words</span>
+          <span>🌐 ${d.language || 'en'}</span>
+          <span>⚡ ${d.processing_time_secs}s</span>
+        </div>
+      </div>
+      <a class="watch-btn" href="${d.watch_url}" target="_blank">Watch ↗</a>
+    </div>
+  `;
+
+  // TL;DR
+  html += section('📋', 'TL;DR', `<p class="tldr-text">${escHtml(d.tldr)}</p>`, true);
+
+  // Key Takeaways
+  if (d.key_takeaways?.length) {
+    const items = d.key_takeaways.map(t => `<li>${escHtml(t)}</li>`).join('');
+    html += section('🧠', `Key Takeaways <span style="color:var(--dim);font-weight:400;font-size:.8rem">(${d.key_takeaways.length})</span>`,
+      `<ul class="takeaway-list">${items}</ul>`, true);
+  }
+
+  // Timestamps
+  if (d.timestamps?.length) {
+    const items = d.timestamps.map(ts => `
+      <a class="ts-item" href="${ts.url || d.watch_url}" target="_blank">
+        <span class="ts-time">${escHtml(ts.time)}</span>
+        <span class="ts-label">${escHtml(ts.label)}</span>
+      </a>`).join('');
+    html += section('🕐', `Timestamps <span style="color:var(--dim);font-weight:400;font-size:.8rem">(${d.timestamps.length})</span>`,
+      `<div class="timestamp-list">${items}</div>`, true);
+  }
+
+  // Chapters
+  if (d.chapters?.length) {
+    const items = d.chapters.map(c => `
+      <div class="chapter-item">
+        <div class="chapter-header">
+          <span class="chapter-start">${escHtml(c.start)}</span>
+          <span class="chapter-title">${escHtml(c.title)}</span>
+        </div>
+        <div class="chapter-summary">${escHtml(c.summary)}</div>
+      </div>`).join('');
+    html += section('📚', 'Chapter Breakdown', `<div class="chapter-list">${items}</div>`);
+  }
+
+  // Notable Quotes
+  if (d.notable_quotes?.length) {
+    const items = d.notable_quotes.map(q => `<div class="quote-item">"${escHtml(q)}"</div>`).join('');
+    html += section('💬', 'Notable Quotes', `<div class="quote-list">${items}</div>`);
+  }
+
+  // Tags
+  if (d.tags?.length) {
+    const items = d.tags.map(t => `<span class="tag">${escHtml(t)}</span>`).join('');
+    html += section('🏷️', 'Topics & Tags', `<div class="tag-list">${items}</div>`);
+  }
+
+  html += `<div class="result-footer">Generated by YTSummarize AI · GPT-4o · ${new Date().toLocaleDateString()}</div>`;
+
+  el.innerHTML = html;
+  el.style.display = 'block';
+
+  // Open first two sections
+  el.querySelectorAll('.section').forEach((s, i) => { if (i < 2) s.classList.add('open') });
+  el.querySelectorAll('.section-header').forEach(h => {
+    h.addEventListener('click', () => h.closest('.section').classList.toggle('open'));
+  });
+}
+
+function section(icon, title, body, open = false) {
+  return `
+    <div class="section ${open ? 'open' : ''}">
+      <div class="section-header">
+        <span class="section-icon">${icon}</span>
+        <span class="section-title">${title}</span>
+        <span class="section-chevron">▾</span>
+      </div>
+      <div class="section-body">${body}</div>
+    </div>`;
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function formatDuration(secs) {
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
+// Submit on Enter
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('urlInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') handleSubmit();
+  });
+});
+</script>
+</body>
+</html>
