@@ -1,15 +1,6 @@
 """
 extractor.py — YouTube transcript extraction
-
-Fetches the transcript (captions) from any YouTube video
-using the youtube-transcript-api library.
-
-Handles:
-  - Standard youtube.com/watch?v=ID URLs
-  - Shortened youtu.be/ID URLs
-  - URLs with extra parameters (&t=, &list=, etc.)
-  - Videos with manual or auto-generated captions
-  - Language fallback (tries requested language, falls back to English)
+Updated for youtube-transcript-api v1.x
 """
 
 import re
@@ -22,7 +13,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class TranscriptEntry:
     text: str
-    start: float   # seconds from video start
+    start: float
     duration: float
 
 
@@ -30,7 +21,7 @@ class TranscriptEntry:
 class TranscriptResult:
     video_id: str
     language: str
-    entries: list[TranscriptEntry]
+    entries: list
 
     @property
     def full_text(self) -> str:
@@ -49,19 +40,10 @@ class TranscriptResult:
 
 
 def extract_video_id(url: str) -> str:
-    """
-    Extract the YouTube video ID from any YouTube URL format.
-
-    Supports:
-      https://www.youtube.com/watch?v=dQw4w9WgXcQ
-      https://youtu.be/dQw4w9WgXcQ
-      https://www.youtube.com/embed/dQw4w9WgXcQ
-      https://youtube.com/watch?v=dQw4w9WgXcQ&t=30s
-    """
     patterns = [
-        r"(?:v=)([a-zA-Z0-9_-]{11})",       # ?v=ID
-        r"(?:youtu\.be/)([a-zA-Z0-9_-]{11})", # youtu.be/ID
-        r"(?:embed/)([a-zA-Z0-9_-]{11})",     # /embed/ID
+        r"(?:v=)([a-zA-Z0-9_-]{11})",
+        r"(?:youtu\.be/)([a-zA-Z0-9_-]{11})",
+        r"(?:embed/)([a-zA-Z0-9_-]{11})",
     ]
     for pattern in patterns:
         match = re.search(pattern, url)
@@ -74,62 +56,59 @@ def extract_video_id(url: str) -> str:
 
 
 def fetch_transcript(url: str, language: str = "en") -> TranscriptResult:
-    """
-    Fetch the full transcript for a YouTube video.
-
-    Args:
-        url:      YouTube video URL
-        language: Preferred language code (e.g. 'en', 'fr', 'es')
-
-    Returns:
-        TranscriptResult with all entries and metadata
-
-    Raises:
-        ValueError: If URL is invalid or video has no captions
-    """
     try:
-        from youtube_transcript_api import (
-            YouTubeTranscriptApi,
-            TranscriptsDisabled,
-            NoTranscriptFound,
-        )
+        from youtube_transcript_api import YouTubeTranscriptApi
     except ImportError:
         raise ImportError("Install youtube-transcript-api: pip install youtube-transcript-api")
 
     video_id = extract_video_id(url)
-    logger.info(f"Fetching transcript for video: {video_id} (language: {language})")
+    logger.info(f"Fetching transcript for video: {video_id}")
 
     try:
-        # Try requested language first, then fall back to any available
+        # ── New API (v1.x) ──────────────────────────────────────────
+        # YouTubeTranscriptApi is now instantiated, not used as a static class
+        ytt = YouTubeTranscriptApi()
+
         try:
-            transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+            # Try to get transcript in requested language first
+            transcript_list = ytt.list(video_id)
             try:
                 transcript = transcript_list.find_transcript([language])
-            except NoTranscriptFound:
-                # Fall back to auto-generated English, then any available
-                logger.warning(f"No '{language}' transcript found, trying fallbacks...")
+            except Exception:
                 try:
                     transcript = transcript_list.find_generated_transcript(["en"])
-                except NoTranscriptFound:
+                except Exception:
+                    # Fall back to whatever is available
                     transcript = next(iter(transcript_list))
-            
-            raw = transcript.fetch()
+
+            fetched = transcript.fetch()
             used_language = transcript.language_code
 
         except Exception:
-            # Simplest fallback — just get whatever is available
-            raw = YouTubeTranscriptApi.get_transcript(video_id)
+            # Final fallback — fetch directly
+            fetched = ytt.fetch(video_id)
             used_language = language
 
-        entries = [
-            TranscriptEntry(
-                text=item["text"].strip(),
-                start=item["start"],
-                duration=item.get("duration", 0.0),
-            )
-            for item in raw
-            if item.get("text", "").strip()
-        ]
+        # Handle both old FetchedTranscript object and plain list formats
+        entries = []
+        items = list(fetched)
+        for item in items:
+            # Support both dict-style and object-style access
+            if hasattr(item, 'text'):
+                text = item.text
+                start = item.start
+                duration = getattr(item, 'duration', 0.0)
+            else:
+                text = item.get("text", "")
+                start = item.get("start", 0.0)
+                duration = item.get("duration", 0.0)
+
+            text = str(text).strip()
+            if text:
+                entries.append(TranscriptEntry(text=text, start=float(start), duration=float(duration)))
+
+        if not entries:
+            raise ValueError("Transcript was empty after processing.")
 
         result = TranscriptResult(
             video_id=video_id,
@@ -137,29 +116,22 @@ def fetch_transcript(url: str, language: str = "en") -> TranscriptResult:
             entries=entries,
         )
 
-        logger.info(
-            f"Transcript fetched: {len(entries)} segments, "
-            f"{result.word_count} words, "
-            f"{result.duration_seconds:.0f}s duration"
-        )
+        logger.info(f"Transcript fetched: {len(entries)} segments, {result.word_count} words")
         return result
 
-    except TranscriptsDisabled:
-        raise ValueError(
-            "This video has captions disabled. "
-            "YTSummarize AI requires videos with available captions."
-        )
-    except NoTranscriptFound:
-        raise ValueError(
-            f"No transcript found for video {video_id}. "
-            "The video may not have captions enabled."
-        )
+    except ValueError:
+        raise
     except Exception as e:
-        raise ValueError(f"Failed to fetch transcript: {str(e)}")
+        error_msg = str(e)
+        if "disabled" in error_msg.lower():
+            raise ValueError("This video has captions disabled.")
+        elif "no transcript" in error_msg.lower():
+            raise ValueError(f"No transcript found for video {video_id}.")
+        else:
+            raise ValueError(f"Failed to fetch transcript: {error_msg}")
 
 
 def format_timestamp(seconds: float) -> str:
-    """Convert float seconds to MM:SS or HH:MM:SS string."""
     seconds = int(seconds)
     hours = seconds // 3600
     minutes = (seconds % 3600) // 60
